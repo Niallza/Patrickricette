@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Ricettario Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --primary: #c92a2a; --bg: #f5f5f7; --card: #ffffff;
+            --pane: #1e3a8a; --dolci: #7e22ce; --basi: #eab308; --lievitati: #e53e3e;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: calc(40px + env(safe-area-inset-top)) 20px 100px; }
+        h1 { font-size: 34px; font-weight: 800; margin-bottom: 25px; text-align: center; color: #1d1d1f; }
+
+        /* Griglia Cartelle */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .folder { background: var(--card); padding: 25px 15px; border-radius: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); cursor: pointer; }
+        .folder i { font-size: 40px; display: block; margin-bottom: 10px; }
+        .folder span { font-weight: 700; font-size: 18px; }
+
+        /* Stile Tecnico Ricetta */
+        .recipe-detail { background: white; padding: 20px; border-radius: 20px; min-height: 80vh; }
+        .title-detail { font-size: 28px; font-weight: 800; border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
+        .section-h { font-size: 18px; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-top: 25px; }
+        .line { font-size: 20px; line-height: 1.6; padding: 5px 0; border-bottom: 1px solid #f0f0f0; }
+
+        .back-btn { background: #e5e5ea; padding: 10px 20px; border-radius: 10px; display: inline-block; margin-bottom: 15px; font-weight: 600; cursor: pointer; }
+        .hidden { display: none; }
+        .fab { position: fixed; bottom: 30px; right: 20px; background: var(--primary); color: white; width: 60px; height: 60px; border-radius: 30px; border: none; font-size: 30px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        
+        /* Modale */
+        #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:white; padding:40px 20px; z-index:1000; overflow-y:auto; }
+        input, textarea { width:100%; padding:15px; margin-bottom:15px; border:1px solid #ddd; border-radius:10px; font-size:18px; font-family: inherit; }
+    </style>
+</head>
+<body>
+
+    <div id="home">
+        <h1>Le Mie Ricette</h1>
+        <div class="grid" id="folder-grid"></div>
+    </div>
+
+    <div id="list" class="hidden">
+        <div class="back-btn" onclick="showHome()">← Cartelle</div>
+        <h2 id="cat-title"></h2>
+        <div id="recipe-items"></div>
+    </div>
+
+    <div id="detail" class="hidden">
+        <div class="back-btn" id="btn-back-list">← Lista</div>
+        <div class="recipe-detail">
+            <div id="det-title" class="title-detail"></div>
+            <div class="section-h">Ingredienti</div>
+            <div id="det-ing"></div>
+            <div class="section-h">Procedimento</div>
+            <div id="det-step"></div>
+        </div>
+    </div>
+
+    <div id="modal">
+        <h2>Nuova Ricetta</h2>
+        <input type="text" id="in-title" placeholder="Nome ricetta">
+        <input type="text" id="in-cat" placeholder="Categoria (Pane, Dolci...)">
+        <textarea id="in-ing" rows="6" placeholder="Ingredienti (uno per riga)"></textarea>
+        <textarea id="in-step" rows="6" placeholder="Passaggi (uno per riga)"></textarea>
+        <button onclick="save()" style="width:100%; background:var(--primary); color:white; padding:20px; border-radius:15px; border:none; font-weight:800;">SALVA</button>
+        <button onclick="closeM()" style="width:100%; background:none; border:none; margin-top:10px;">Annulla</button>
+    </div>
+
+    <button class="fab" onclick="openM()">+</button>
+
+    <script>
+let recipes = JSON.parse(localStorage.getItem('pro_recipes')) || [];
+        const icons = { "Pane": "🍞", "Dolci": "🍰", "Basi": "🥣", "Lievitati": "🍕" };
+        let pressTimer; // Timer per il tocco lungo
+
+        function showHome() {
+            document.getElementById('home').className = '';
+            document.getElementById('list').className = 'hidden';
+            document.getElementById('detail').className = 'hidden';
+            const grid = document.getElementById('folder-grid');
+            const cats = [...new Set(recipes.map(r => r.cat))];
+            
+            if(cats.length === 0) {
+                grid.innerHTML = "<p style='grid-column: 1/3; text-align:center; color:grey; margin-top:20px;'>Nessuna ricetta presente.</p>";
+            } else {
+                grid.innerHTML = cats.map(c => `
+                    <div class="folder" onclick="showCat('${c}')">
+                        <i>${icons[c] || "📂"}</i>
+                        <span>${c}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function showCat(c) {
+            document.getElementById('home').className = 'hidden';
+            document.getElementById('list').className = '';
+            document.getElementById('cat-title').innerText = c;
+            const items = document.getElementById('recipe-items');
+            const filtered = recipes.filter(r => r.cat === c);
+            
+            items.innerHTML = filtered.map(r => `
+                <div class="folder recipe-item" 
+                     style="text-align:left; margin-bottom:10px; padding:20px; position:relative;" 
+                     onclick="showDet(${r.id})"
+                     oncontextmenu="handleRightClick(event, ${r.id})"
+                     ontouchstart="handleTouchStart(event, ${r.id})"
+                     ontouchend="handleTouchEnd()"
+                     onmousedown="handleMouseDown(event, ${r.id})"
+                     onmouseup="handleMouseUp()">
+                    <span style="font-size:20px; font-weight:600;">${r.title}</span>
+                </div>
+            `).join('');
+        }
+
+        /* --- LOGICA ELIMINAZIONE AVANZATA --- */
+
+        // 1. Tasto Destro (PC)
+        function handleRightClick(e, id) {
+            e.preventDefault(); // Impedisce al menu del browser di apparire
+            confirmDelete(id);
+        }
+
+        // 2. Tocco Lungo (Mobile)
+        function handleTouchStart(e, id) {
+            pressTimer = window.setTimeout(() => {
+                confirmDelete(id);
+            }, 800); // 800ms per attivare il tocco lungo
+        }
+        function handleTouchEnd() { clearTimeout(pressTimer); }
+
+        // 3. Click Lungo (Mouse ma non tasto destro)
+        function handleMouseDown(e, id) { if(e.button === 0) pressTimer = window.setTimeout(() => confirmDelete(id), 800); }
+        function handleMouseUp() { clearTimeout(pressTimer); }
+
+        function confirmDelete(id) {
+            const r = recipes.find(x => x.id === id);
+            if(confirm(`Vuoi eliminare definitivamente "${r.title}"?`)) {
+                recipes = recipes.filter(x => x.id !== id);
+                localStorage.setItem('pro_recipes', JSON.stringify(recipes));
+                showHome();
+            }
+        }
+
+        /* --- FINE LOGICA ELIMINAZIONE --- */
+
+        function showDet(id) {
+            const r = recipes.find(x => x.id === id);
+            document.getElementById('list').className = 'hidden';
+            document.getElementById('detail').className = '';
+            document.getElementById('det-title').innerText = r.title;
+            document.getElementById('det-ing').innerHTML = r.ing.split('\n').filter(l => l.trim() !== "").map(l => `<div class="line">• ${l}</div>`).join('');
+            document.getElementById('det-step').innerHTML = r.step.split('\n').filter(l => l.trim() !== "").map(l => `<div class="line">• ${l}</div>`).join('');
+            document.getElementById('btn-back-list').onclick = () => showCat(r.cat);
+        }
+
+        function openM() { document.getElementById('modal').style.display='block'; }
+        function closeM() { document.getElementById('modal').style.display='none'; }
+
+        function save() {
+            const t = document.getElementById('in-title').value.trim();
+            const c = document.getElementById('in-cat').value.trim() || "Varie";
+            if(!t) return alert("Inserisci un titolo");
+            recipes.push({ id: Date.now(), title: t, cat: c, ing: document.getElementById('in-ing').value, step: document.getElementById('in-step').value });
+            localStorage.setItem('pro_recipes', JSON.stringify(recipes));
+            document.getElementById('in-title').value = "";
+            closeM();
+            showHome();
+        }
+
+        showHome();
+        </script>
+</body>
+</html>

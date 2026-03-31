@@ -1,0 +1,11 @@
+{
+  "name": "Ricettario Pro",
+  "short_name": "Ricette",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#c92a2a",
+  "icons": [
+    { "src": "icon.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}
