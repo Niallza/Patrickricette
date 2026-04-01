@@ -20,19 +20,17 @@
         .folder { background: var(--card); padding: 25px 15px; border-radius: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); cursor: pointer; }
         .folder i { font-size: 35px; display: block; margin-bottom: 8px; }
         .recipe-item { text-align: left; margin-bottom: 10px; padding: 18px; display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 15px; border-left: 5px solid var(--primary); }
-        .recipe-detail { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); min-height: 60vh; position: relative; }
-        .title-detail { font-size: 28px; font-weight: 800; border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; color: #000; padding-right: 60px; }
+        .recipe-detail { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); min-height: 60vh; }
+        .title-detail { font-size: 28px; font-weight: 800; border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; color: #000; }
         .section-h { font-size: 14px; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-top: 25px; }
         .line { font-size: 19px; line-height: 1.6; padding: 10px 0; border-bottom: 1px solid #f2f2f7; white-space: pre-wrap; color: #3a3a3c; }
         .back-btn { background: #e5e5ea; padding: 12px 20px; border-radius: 12px; display: inline-block; margin-bottom: 15px; font-weight: 600; cursor: pointer; }
-        
-        /* Nuovi tasti Gestione */
         .action-bar { display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end; }
-        .edit-btn { background: var(--accent); color: white; padding: 10px 15px; border-radius: 10px; border:none; font-weight:700; font-size: 14px; }
-        .del-btn { background: var(--danger); color: white; padding: 10px 15px; border-radius: 10px; border:none; font-weight:700; font-size: 14px; }
-
+        .edit-btn { background: var(--accent); color: white; padding: 10px 15px; border-radius: 10px; border:none; font-weight:700; }
+        .del-btn { background: var(--danger); color: white; padding: 10px 15px; border-radius: 10px; border:none; font-weight:700; }
         .fab { position: fixed; bottom: 30px; right: 20px; background: var(--primary); color: white; width: 65px; height: 65px; border-radius: 35px; border: none; font-size: 35px; box-shadow: 0 8px 20px rgba(201, 42, 42, 0.3); z-index: 99; }
         #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:white; padding:40px 20px; z-index:1000; overflow-y:auto; }
+        #ocr-status { display:none; background:#f0f0ff; color:#5856d6; padding:10px; border-radius:10px; text-align:center; font-weight:700; margin-bottom:10px; }
         input, textarea { width:100%; padding: 15px; margin-bottom: 15px; border: 1px solid #d1d1d6; border-radius: 12px; font-size: 16px; background: #f2f2f7; font-family: inherit; }
         .btn-ai { background: #5856d6; color: white; padding: 16px; border-radius: 14px; border: none; font-weight: 700; width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         .btn-save { width:100%; background:var(--primary); color:white; padding:20px; border-radius:15px; border:none; font-weight:800; font-size:18px; }
@@ -77,6 +75,7 @@
 
     <div id="modal">
         <h2 id="modal-title">Nuova Ricetta</h2>
+        <div id="ocr-status">✨ L'IA sta leggendo... attendi...</div>
         <div id="ocr-area">
             <button class="btn-ai" onclick="document.getElementById('ai-input').click()">📸 LEGGI FOTO (AI)</button>
             <input type="file" id="ai-input" accept="image/*" style="display:none" onchange="runOCR(this)">
@@ -112,13 +111,10 @@
             const data = snapshot.val();
             recipes = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
             document.getElementById('loader').style.display = 'none';
-            if(!document.getElementById('detail').classList.contains('hidden')) {
-                const currentId = document.getElementById('edit-id').value;
-                const exists = recipes.find(r => r.id === currentId);
-                if(exists) showDet(currentId); else showHome();
-            } else if(!document.getElementById('list').classList.contains('hidden')) {
+            // Se siamo in una categoria, aggiorna la lista senza chiuderla
+            if(!document.getElementById('list').classList.contains('hidden')) {
                 showCat(document.getElementById('cat-title').innerText);
-            } else {
+            } else if(document.getElementById('home').classList.contains('hidden') === false) {
                 showHome();
             }
         });
@@ -127,13 +123,19 @@
             document.getElementById('home').classList.remove('hidden');
             document.getElementById('list').classList.add('hidden');
             document.getElementById('detail').classList.add('hidden');
+            // Pulizia testi per evitare trascinamenti
+            document.getElementById('det-title').innerText = "";
+            document.getElementById('det-ing').innerText = "";
+            document.getElementById('det-step').innerText = "";
+            
             const cats = [...new Set(recipes.map(r => r.cat))];
-            document.getElementById('folder-grid').innerHTML = cats.map(c => `<div class="folder" onclick="showCat('${c}')"><i>${icons[c] || "📂"}</i><span>${c}</span></div>`).join('') || "<p style='text-align:center;grid-column:1/3;color:gray;padding-top:40px;'>Tocca + per aggiungere la prima ricetta.</p>";
+            document.getElementById('folder-grid').innerHTML = cats.map(c => `<div class="folder" onclick="showCat('${c}')"><i>${icons[c] || "📂"}</i><span>${c}</span></div>`).join('') || "<p style='text-align:center;grid-column:1/3;padding-top:40px;'>Tocca + per iniziare.</p>";
         }
 
         function showCat(c) {
             document.getElementById('home').classList.add('hidden');
             document.getElementById('list').classList.remove('hidden');
+            document.getElementById('detail').classList.add('hidden');
             document.getElementById('cat-title').innerText = c;
             const filtered = recipes.filter(r => r.cat === c);
             document.getElementById('recipe-items').innerHTML = filtered.map(r => `<div class="recipe-item" onclick="showDet('${r.id}')"><span>${r.title}</span><span>→</span></div>`).join('');
@@ -142,7 +144,6 @@
         function showDet(id) {
             const r = recipes.find(x => x.id === id);
             if(!r) return;
-            document.getElementById('home').classList.add('hidden');
             document.getElementById('list').classList.add('hidden');
             document.getElementById('detail').classList.remove('hidden');
             document.getElementById('det-title').innerText = r.title;
@@ -154,12 +155,26 @@
             document.getElementById('btn-back-to-list').onclick = () => showCat(r.cat);
         }
 
+        async function runOCR(input) {
+            if (input.files && input.files[0]) {
+                const status = document.getElementById('ocr-status');
+                status.style.display = 'block';
+                try {
+                    const worker = await Tesseract.createWorker('ita');
+                    const { data: { text } } = await worker.recognize(input.files[0]);
+                    // Pulizia testo dai simboli strani
+                    const cleanText = text.replace(/[^a-zA-Z0-9àèìòùÁÉÍÓÚ\s,.:\-\/]/g, '');
+                    document.getElementById('in-ing').value += "\n" + cleanText;
+                    await worker.terminate();
+                    alert("IA: Lettura finita!");
+                } catch (e) { alert("Errore IA"); }
+                status.style.display = 'none';
+            }
+        }
+
         function deleteRecipe(id, name) {
-            if(confirm(`⚠️ Vuoi davvero eliminare definitivamente la ricetta "${name}"?`)) {
-                db.ref('ricette/' + id).remove().then(() => {
-                    showHome();
-                    alert("Ricetta eliminata.");
-                });
+            if(confirm(`Eliminare "${name}"?`)) {
+                db.ref('ricette/' + id).remove().then(() => showHome());
             }
         }
 
@@ -195,17 +210,9 @@
                 ing: document.getElementById('in-ing').value,
                 step: document.getElementById('in-step').value
             };
-            if(!data.title) return alert("Inserisci un titolo!");
+            if(!data.title) return alert("Manca il titolo!");
             if(id) db.ref('ricette/' + id).set(data, () => closeM());
             else db.ref('ricette').push(data, () => closeM());
-        }
-
-        async function runOCR(input) {
-            if (input.files && input.files[0]) {
-                const res = await Tesseract.recognize(input.files[0], 'ita');
-                document.getElementById('in-ing').value += "\n" + res.data.text;
-                alert("Lettura completata!");
-            }
         }
 
         function searchRecipes() {
